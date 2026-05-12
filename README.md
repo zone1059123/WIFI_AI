@@ -1,38 +1,47 @@
-# WIFI_AI# 📡 WiFi 6E 天線設計 AI 輔助決策系統
-### WiFi 6E Antenna Design AI-Assistant System
+# 🔬 WiFi 6E 天線設計多模型交叉驗證系統
+### Antenna Design AI-Assistant: Multi-Model Cross-Validation Lab
 
-![Status](https://img.shields.io/badge/Status-Live-brightgreen)
-![Python](https://img.shields.io/badge/Python-3.9+-blue)
-![Framework](https://img.shields.io/badge/Framework-Streamlit-ff4b4b)
+[![Link](https://img.shields.io/badge/Live-Web%20App-ff4b4b?style=for-the-badge&logo=streamlit)](https://wifiai-gzraaanftudokcykdupzyx.streamlit.app/)
+[![Python](https://img.shields.io/badge/Python-3.9+-blue?style=for-the-badge&logo=python)](https://www.python.org/)
+[![Framework](https://img.shields.io/badge/Framework-Streamlit-white?style=for-the-badge&logo=streamlit)](https://streamlit.io/)
 
-## 📖 專案簡介
-本專案為大學專題研究成果，旨在解決傳統天線電磁模擬（如 CST）耗時過長的問題。我們透過 **機器學習 (Machine Learning)** 技術，訓練了一個能針對 WiFi 6E 三頻（2.45GHz, 5.5GHz, 6.5GHz）進行 S11 參數預測的輕量化模型，並封裝成易於使用的 Web APP。
+## 📖 專案概述
+本專案開發了一套針對 WiFi 6E（2.45GHz, 5.5GHz, 6.5GHz）天線設計的智能輔助決策系統。傳統電磁模擬軟體（如 CST）在進行參數優化時極為耗時，本系統透過 **機器學習 (Machine Learning)** 技術，實現了秒級的 S11 參數預測，並導入「多模型交叉驗證」機制，確保預測結果的工程參考價值。
 
-## 🚀 核心亮點
-- **即時預測**：將原本需要 15-20 分鐘的 CST 模擬縮短至 **< 0.1 秒**。
-- **小樣本優化**：利用 239 筆精確模擬數據，透過線性回歸與隨機森林實現高泛化性。
-- **不確定性診斷**：內建「信心指數」分析，提醒工程師何時需回歸傳統模擬驗證。
-- **跨平台展示**：基於 Streamlit 開發，支援手機與網頁即時操作。
+🔗 **即時展示網址**：[點此進入系統](https://wifiai-gzraaanftudokcykdupzyx.streamlit.app/)
 
-## 🛠️ 技術棧
-- **開發語言**：Python
-- **數據處理**：Pandas, NumPy
-- **機器學習**：Scikit-learn (Linear Regression, Random Forest)
-- **視覺化**：Matplotlib
-- **部署**：Streamlit Cloud / GitHub Codespaces
+## 🚀 核心功能
+- **精確參數輸入**：捨棄傳統滑桿，採用 `Number Input` 模式，支援小數點後兩位的精確幾何尺寸調整。
+- **三模型並行演算**：系統同時調用三種不同性質的演算法：
+  1. **線性回歸 (Linear Regression)**：捕捉參數間的全局線性趨勢。
+  2. **隨機森林 (Random Forest)**：捕捉複雜的非線性特徵。
+  3. **支持向量機 (SVR)**：處理小樣本數據下的穩定擬合。
+- **模型共識度診斷 (Confidence Score)**：透過計算三模型預測值之間的偏差（標準差），自動產生一致性得分。得分越高，代表該設計組合越可靠。
+- **動態數據管理**：
+  - **內建數據**：預設搭載 239 筆 CST 精確模擬數據。
+  - **自定義上傳**：支援用戶上傳 CSV/TSV 格式的數據集，系統會即時「重訓練」模型以適應新的天線架構。
+
+## 🛠️ 技術規格
+- **數據清洗**：具備欄位模糊匹配功能，能自動識別包含空格、Tab 或符號的 CSV 標頭。
+- **前端框架**：Streamlit Cloud (實現 24/7 持續運行)。
+- **機器學習庫**：Scikit-learn (StandardScaler, MultiOutputRegressor)。
+- **繪圖引擎**：Matplotlib (產出符合學術論文規格的 S11 頻譜圖)。
 
 ## 📂 檔案結構
-- `app.py`: 系統核心程式碼（包含 UI 介面與模型推理邏輯）。
-- `antenna_data.csv`: 經過 CST 模擬生成的 239 筆天線幾何參數與 S11 數據。
-- `requirements.txt`: 專案執行環境依賴清單。
+- `app.py`: 核心應用程式，包含 UI、多模型訓練與交叉驗證邏輯。
+- `antenna_data.csv`: 系統預設訓練數據集。
+- `requirements.txt`: 雲端部署所需之環境套件清單。
+- `README.md`: 專案說明文件。
 
-## 📊 使用說明
-1. 開啟 [專案網頁連結] (在此處貼上你的 Streamlit 網址)。
-2. 在左側側邊欄調整天線參數：`Dist` (間距), `L_ant2` (長度), `W_ant2` (寬度)。
-3. 系統將即時產出三個頻段的 S11 預測值與頻譜圖。
-4. 參考「預測穩定度分析」判斷結果之工程參考價值。
+## 📊 如何開始？
+1. **進入網頁**：開啟[系統網址](https://wifiai-gzraaanftudokcykdupzyx.streamlit.app/)。
+2. **數據選擇**：於左側選擇使用「系統內建數據」或「上傳自定義 CSV」。
+3. **輸入參數**：在左側欄位精確輸入天線的 `Dist`, `L_ant2`, `W_ant2` 尺寸。
+4. **分析結果**：
+   - 觀察下方表格中三種模型的數值對照（綠色高亮代表最佳性能預測）。
+   - 查看右側的「一致性得分」，判斷是否需回歸 CST 進行最終驗證。
 
 ---
-**專題作者**：[張宇宸]  
-**指導老師**：[黃崇豪]  
-**學術單位**：[中原大學 電機三甲]
+**程式作者**：[張宇宸]  
+**專題指導**：[黃崇豪教授]  
+**所屬單位**：[中原大學電機工程系三甲]
