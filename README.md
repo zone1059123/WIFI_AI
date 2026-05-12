@@ -3,7 +3,7 @@
 
 [![Live Demo](https://img.shields.io/badge/Live-Web%20App-ff4b4b?style=for-the-badge&logo=streamlit)](https://wifiai-gzraaanftudokcykdupzyx.streamlit.app/)
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9+-blue?style=for-the-badge&logo=python)](https://www.python.org/)
-[![School](https://img.shields.io/badge/CYCU-電機工程學系-red)](https://ee.cycu.edu.tw/)
+[![School](https://img.shields.io/badge/CYCU-電機工程學系-red)](https://eeweb.cycu.edu.tw/)
 
 ## 🎓 專案背景與作者資料
 * **學校單位**：中原大學 電機工程學系 三甲
