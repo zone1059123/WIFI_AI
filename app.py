@@ -9,9 +9,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.multioutput import MultiOutputRegressor
 
 # --- 1. 頁面配置 ---
-st.set_page_config(page_title="Antenna AI Lab", page_icon="📡", layout="wide")
+st.set_page_config(page_title="WiFi 6E Antenna Mini-Data Lab", page_icon="📡", layout="wide")
 
-# --- 2. 核心訓練函數 (保持強大的格式偵測與模糊比對) ---
+# --- 2. 核心訓練函數 (針對小樣本優化) ---
 def train_all_models(df):
     try:
         df.columns = [str(col).strip() for col in df.columns]
@@ -22,6 +22,7 @@ def train_all_models(df):
             'Tables\\0D Results\\S1,1_6.5GHz'
         ]
 
+        # 模糊匹配函數
         def clean_str(s):
             return s.lower().replace(" ", "").replace("\\", "").replace(",", "").replace("\t", "")
 
@@ -36,9 +37,7 @@ def train_all_models(df):
         found_targets = [feature_map.get(t) for t in orig_targets if t in feature_map]
 
         if len(found_features) < 3 or len(found_targets) < 3:
-            st.error("❌ 檔案欄位匹配失敗！")
-            st.write("🔍 系統預期：", orig_features + orig_targets)
-            st.write("📄 CSV 實際偵測：", df.columns.tolist())
+            st.error("❌ 欄位匹配失敗")
             return None
             
         df = df.dropna(subset=found_features + found_targets)
@@ -48,9 +47,13 @@ def train_all_models(df):
         scaler = StandardScaler().fit(X)
         X_scaled = scaler.transform(X)
         
+        # --- 小樣本優化模型組合 ---
+        # 1. Linear Regression (Low Variance, High Bias) - 捕捉大趨勢
         m_lr = LinearRegression().fit(X_scaled, y)
-        m_rf = RandomForestRegressor(n_estimators=100, random_state=42).fit(X_scaled, y)
-        m_svr = MultiOutputRegressor(SVR(kernel='rbf', C=100)).fit(X_scaled, y)
+        # 2. Random Forest (Reduced Overfitting via Ensemble) - 處理非線性
+        m_rf = RandomForestRegressor(n_estimators=50, max_depth=7, random_state=42).fit(X_scaled, y)
+        # 3. SVR (Robust to Outliers) - 適合極小樣本
+        m_svr = MultiOutputRegressor(SVR(kernel='rbf', C=10, epsilon=0.1)).fit(X_scaled, y)
         
         return scaler, m_lr, m_rf, m_svr, found_features, len(df)
     except Exception as e:
@@ -58,26 +61,24 @@ def train_all_models(df):
         return None
 
 # --- 3. 側邊欄：模式切換與數值輸入 ---
-st.sidebar.title("📥 數據與參數管理")
+st.sidebar.title("🔬 小樣本 AI 實驗室")
 
 data_mode = st.sidebar.radio(
-    "1. 選擇數據來源：",
-    ("使用系統內建數據 (antenna_data.csv)", "上傳自己的數據檔案 (CSV/TSV)")
+    "1. 數據源選擇：",
+    ("內建小樣本數據 (239筆)", "上傳新數據 (CSV/TSV)")
 )
 
 raw_df = None
-if data_mode == "使用系統內建數據 (antenna_data.csv)":
+if data_mode == "內建小樣本數據 (239筆)":
     try:
         raw_df = pd.read_csv('antenna_data.csv', sep=None, engine='python')
-        st.sidebar.success("✅ 已載入系統預設數據")
     except:
         st.sidebar.error("找不到預設檔案。")
 else:
-    uploaded_file = st.sidebar.file_uploader("上傳天線數據", type=["csv", "txt"])
+    uploaded_file = st.sidebar.file_uploader("上傳 CSV 檔案", type=["csv", "txt"])
     if uploaded_file:
         raw_df = pd.read_csv(uploaded_file, sep=None, engine='python')
     else:
-        st.info("請上傳 CSV 檔案。")
         st.stop()
 
 if raw_df is not None:
@@ -88,73 +89,68 @@ if raw_df is not None:
         st.stop()
 
 st.sidebar.divider()
-st.sidebar.write("2. 精確輸入設計參數 (mm)")
+st.sidebar.write("2. 設計參數精確輸入 (mm)")
 
-# --- 改動重點：將 Slider 改為 Number Input ---
 user_vals = []
-# 預設值參考
 default_vals = [5.0, 15.0, 2.5] 
-
 for i, f in enumerate(feat_cols):
-    # 使用 number_input 允許精確打字
-    val = st.sidebar.number_input(
-        label=f"輸入 {f}", 
-        min_value=0.0, 
-        max_value=100.0, 
-        value=default_vals[i] if i < len(default_vals) else 10.0,
-        step=0.01,   # 設定調整步進值
-        format="%.2f" # 顯示到小數點後兩位
-    )
+    val = st.sidebar.number_input(f"{f}", value=default_vals[i], step=0.01, format="%.2f")
     user_vals.append(val)
 
-# --- 4. 預測與展示邏輯 ---
+# --- 4. 預測與交叉比對 ---
 input_scaled = scaler.transform([user_vals])
 p_lr = m_lr.predict(input_scaled)[0]
 p_rf = m_rf.predict(input_scaled)[0]
 p_svr = m_svr.predict(input_scaled)[0]
 
+# 計算模型一致性 (Confidence)
 all_p = np.array([p_lr, p_rf, p_svr])
 std_err = np.mean(np.std(all_p, axis=0))
-confidence = max(0, min(100, 100 - (std_err * 25)))
+confidence = max(0, min(100, 100 - (std_err * 20)))
 
-# --- 5. 主介面展示 ---
-st.title("🔬 WiFi 6E 多模型交叉驗證系統 (精確輸入版)")
-st.caption(f"當前訓練樣本數：{n_samples} 筆 | 目前參數：{dict(zip(feat_cols, user_vals))}")
+# --- 5. 主介面：強調小樣本分析 ---
+st.title("📡 WiFi 6E 天線：小樣本多模型交叉驗證系統")
+st.info(f"💡 當前處於「小樣本模式」：已載入 {n_samples} 筆高品質模擬數據，並啟動三算法互校機制。")
 
+# 數據比對表
 res_table = pd.DataFrame({
     "頻率 (GHz)": ["2.45", "5.5", "6.5"],
-    "線性回歸 (LR)": p_lr, 
-    "隨機森林 (RF)": p_rf, 
-    "支持向量機 (SVR)": p_svr
+    "Linear (趨勢捕捉)": p_lr, 
+    "RandomForest (非線性)": p_rf, 
+    "SVR (魯棒擬合)": p_svr
 }).set_index("頻率 (GHz)")
 
-st.subheader("📋 三模型預測數值比對 (dB)")
+st.subheader("📋 跨算法預測對照 (dB)")
 st.table(res_table.style.highlight_min(axis=1, color='#d4edda'))
 
-col_plot, col_conf = st.columns([2, 1])
+c_plot, c_conf = st.columns([2, 1])
 
-with col_plot:
-    st.subheader("📈 交叉比對頻譜圖")
+with c_plot:
+    st.subheader("📈 多模型預測頻譜")
     fig, ax = plt.subplots(figsize=(10, 5))
     pts = [2.45, 5.5, 6.5]
-    ax.plot(pts, p_lr, 'o-', label='LR', linewidth=2)
-    ax.plot(pts, p_rf, 's--', label='RF', linewidth=2)
-    ax.plot(pts, p_svr, '^-.', label='SVR', linewidth=2)
-    ax.axhline(-10, color='red', linestyle=':', label='Matched Threshold')
+    ax.plot(pts, p_lr, 'o-', label='LR Model (Trend)')
+    ax.plot(pts, p_rf, 's--', label='RF Model (Complexity)')
+    ax.plot(pts, p_svr, '^-.', label='SVR Model (Robust)')
+    ax.axhline(-10, color='red', linestyle=':', label='-10dB Limit')
     ax.set_ylim(-35, 0)
     ax.set_ylabel("S11 (dB)")
     ax.set_xlabel("Frequency (GHz)")
-    ax.grid(True, alpha=0.3)
     ax.legend()
+    ax.grid(True, alpha=0.3)
     st.pyplot(fig)
 
-with col_conf:
-    st.subheader("🛡️ 多模型共識分析")
-    st.metric("一致性得分", f"{confidence:.1f}%")
+with c_conf:
+    st.subheader("🛡️ 小樣本預測可靠度")
+    st.metric("模型一致性評分", f"{confidence:.1f}%")
     st.progress(int(confidence))
+    
     if confidence > 80:
-        st.success("🎯 **高度一致**：三模型結論相近。")
+        st.success("🎯 **高度可靠**：不同性質演算法結論一致。")
     elif confidence > 50:
-        st.warning("⚖️ **存在分歧**：建議參考 RF 或 SVR 結果。")
+        st.warning("⚖️ **建議校驗**：算法間存在微小分歧。")
     else:
-        st.error("⚠️ **數據外推**：預測分歧大，請回歸電磁模擬。")
+        st.error("🚨 **數據外延警告**：建議重新進行 CST 模擬。")
+    
+    st.write("---")
+    st.caption("**為什麼需要多模型比對？**\n在小樣本場景下，單一模型容易產生偏差。我們透過線性、樹狀與核函數三種完全不同邏輯的算法進行「投票」，只有當三者意見接近時，預測才具備工程意義。")
