@@ -63,18 +63,37 @@ def train_full_suite(df):
         return scaler, trained_models, found_f, len(df), pd.DataFrame(eff_list), df[found_f].min(), df[found_f].max()
     except: return None
 
-# --- 3. 側邊欄與資料載入 ---
+# --- 3. 側邊欄與資料載入 (完全體：支援上傳 + 內建) ---
 st.sidebar.image("https://upload.wikimedia.org/wikipedia/zh/thumb/4/4e/Chung_Yuan_Christian_University_Logo.svg/1200px-Chung_Yuan_Christian_University_Logo.svg.png", width=80)
 st.sidebar.title("中原電機天線 AI 站")
 st.sidebar.caption("作者：張宇宸 | 指導：黃崇豪 教授")
 
-raw_df = pd.read_csv('antenna_data.csv', sep=None, engine='python')
+st.sidebar.divider()
+# 加入數據源切換選單
+data_mode = st.sidebar.radio("📁 數據源選擇", ("系統內建 (239筆)", "手動上傳新數據"))
+
+if data_mode == "系統內建 (239筆)":
+    # 讀取原本的檔案
+    raw_df = pd.read_csv('antenna_data.csv', sep=None, engine='python')
+else:
+    # 顯示上傳元件
+    uploaded_file = st.sidebar.file_uploader("請上傳天線數據 CSV", type=["csv"])
+    if not uploaded_file:
+        st.info("💡 提示：請上傳 CSV 檔案以開始分析")
+        st.stop() # 沒上傳檔案前，程式會停在這裡，不會報錯
+    raw_df = pd.read_csv(uploaded_file, sep=None, engine='python')
+
+# 訓練模型並獲取結果
 res = train_full_suite(raw_df)
-if not res: st.stop()
+if not res: 
+    st.error("數據格式不符，請檢查 CSV 是否包含 Dist, L_ant2, W_ant2 等欄位")
+    st.stop()
+
 scaler, m_dict, feat_cols, n_samples, eff_df, f_min, f_max = res
 
 st.sidebar.divider()
 st.sidebar.subheader("📐 幾何參數調試")
+# 注意：這裡的 value 改用 raw_df 的平均值，這樣你上傳新檔案時，滑桿初始值會自動跟著新檔案跑
 u_vals = [st.sidebar.number_input(f"{f}", value=float(raw_df[f].mean()), step=0.01, format="%.2f") for f in feat_cols]
 
 # 鎖定功能 (Session State)
