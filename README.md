@@ -1,62 +1,48 @@
-# 🧬 WiFi 6E 天線設計：五大模型超級驗證與小數據學習實驗室
-### AI-Antenna Lab: Hyper-Model Cross-Validation & Data-Efficiency Analysis
+# 📡 CYCU Antenna AI Master: 智慧化天線設計與反向導航系統
+### AI-Powered Antenna Design: Real-time Debugging & Inverse Navigation Station
 
 [![Live Demo](https://img.shields.io/badge/Live-Web%20App-ff4b4b?style=for-the-badge&logo=streamlit)](https://wifiai-gzraaanftudokcykdupzyx.streamlit.app/)
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9+-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 [![School](https://img.shields.io/badge/CYCU-電機工程學系-red)](https://ee.cycu.edu.tw/)
 
-## 🎓 專案作者與指導
+## 🎓 作者資訊
 * **學校單位**：中原大學 電機工程學系 三甲
 * **專題作者**：張宇宸 (Yu-Chen Chang)
 * **指導教授**：黃崇豪 教授
-* **專案網址**：[CYCU Antenna AI Lab](https://wifiai-gzraaanftudokcykdupzyx.streamlit.app/)
+* **專案定位**：電磁模擬輔助設計 (AI-assisted EM Design)
 
 ---
 
-## 🎯 專案目的 (Project Objective)
-本專案針對 WiFi 6E 天線開發流程中「模擬成本過高」的問題，提出一套基於機器學習的輔助系統。我們成功將 239 筆高品質 CST 數據轉化為可即時運算的預測模型，並導入**敏感度分析**與**反向設計建議**，優化研發效率。
+## 🎯 專案核心目標
+本系統專門為 WiFi 6E 三頻天線設計打造，旨在解決傳統 CST 模擬耗時過長的痛點。透過五大機器學習模型，我們不僅實現了「秒級預測」，更導入了**動態對照**與**自動化搜尋**功能，將 AI 從單純的「預測工具」提升為「設計決策導航」。
 
-## 🚀 核心功能與技術來源 (Technical Citations)
+## 🚀 重大更新亮點 (Latest Updates)
 
-本系統之實作參考了多項工業界與學術界的機器學習標準規範，具體參考來源標註如下：
+### 1. 🔒 鎖定對照功能 (Design Comparison)
+* **功能描述**：支援「一鍵鎖定」當前預測頻譜，當使用者微調幾何參數時，系統會同時顯示舊設計（對照組）與新設計（實驗組）的曲線位移。
+* **技術來源**：參考 **Streamlit Session State** 狀態管理機制，實現動態緩存對比。
+* **工程價值**：方便工程師直觀觀察參數（如 L, W, Dist）對頻譜位移的敏感度。
 
-### 1. 五大模型交叉驗證 (Cross-Validation Framework)
-* **技術實作**：同時運行 LR, RF, SVR, GBM, KNN 五種演算法。
-* **參考來源**：參考自 **Scikit-learn (sklearn)** 官方文件的 *Ensemble Methods* 章節。
-* **應用點**：使用多輸出回歸 (Multi-output Regression) 處理三頻段同步預測。
+### 2. 🤖 AI 反向設計導航 (Inverse Dimension Recommender)
+* **功能描述**：使用者設定目標 S11 門檻（如 -15dB），系統自動透過 **Monte Carlo Sampling (蒙地卡羅抽樣)** 在背景模擬 500 組組合。
+* **技術來源**：參考工業界常用的 **Heuristic Optimization (啟發式優化)** 策略。
+* **工程價值**：解決「給定性能要求，反求幾何尺寸」的逆向工程難題。
 
-### 2. 特徵敏感度分析 (Sensitivity Analysis)
-* **技術實作**：利用隨機森林的 `feature_importances_` 屬性提取幾何參數權重。
-* **參考來源**：參考自 **Breiman (2001)** 的隨機森林理論。
-* **應用點**：提供工程師直觀的尺寸影響圖表，判斷 L, W, Dist 哪個參數最為關鍵。
+### 3. 五大模型集成與數據演化
+* **技術架構**：整合 Random Forest, SVR, GBM, Linear, KNN。
+* **學術引用**：
+    * **Random Forest**: 參考 Breiman (2001) 之隨機森林理論處理非線性特徵。
+    * **Efficiency Matrix**: 參考 Vapnik-Chervonenkis (VC) 理論分析小樣本收斂性。
 
-### 3. 小樣本演化效率分析 (Efficiency Matrix)
-* **技術實作**：對比 20%、50%、100% 數據量級下的 MAE 誤差收斂。
-* **參考來源**：參考自 **Vapnik-Chervonenkis (VC) Theory** 關於結構風險最小化之討論。
-* **應用點**：證明系統在極小數據量（僅 40 餘筆）時即可達到穩定趨勢。
+## 📊 數據說明 (Data Statistics)
+* **來源**：由 CST Studio Suite 模擬產出之 239 筆 WiFi 6E 結構化數據。
+* **特徵**：Dist (間距), L_ant2 (長度), W_ant2 (寬度)。
+* **標籤**：2.45GHz, 5.5GHz, 6.5GHz 之 S11 反射損耗 (dB)。
 
-### 4. 反向設計優化 (Inverse Design Recommendation)
-* **技術實作**：使用 Monte Carlo 方法生成 100 組隨機維度組合，經由預測模型選取最優解。
-* **參考來源**：參考自工業界常見的 **Grid Search (網格搜索)** 與 **Heuristic Optimization** 策略。
-* **應用點**：輸入目標性能，由 AI 建議最佳幾何尺寸。
-
-## 📂 檔案架構
-* `app.py`: 五大模型核心邏輯、敏感度分析圖表與 UI 實作。
-* `antenna_data.csv`: 經由 CST Studio Suite 模擬產出之 239 筆結構化數據。
-* `requirements.txt`: 包含 NumPy, Pandas, Scikit-learn, Matplotlib, Streamlit 等依賴。
-
-## 💡 如何使用
-1. **設定參數**：在側邊欄輸入天線尺寸（精確至 0.01mm）。
-2. **檢視指標**：觀察頂部儀表板，確認 S11 是否低於 -10dB (PASS)。
-3. **數據分析**：向下滾動查看各模型偏差、參數影響權重及數據量演化表。
-4. **報告導出**：點擊「導出預測報告 (CSV)」按鈕，獲取當前設計數據。
-
----
-### 📚 技術文獻引用 (References)
-1. **Scikit-learn Developers (2024)**. *Scikit-learn User Guide*. [Online]. 
-2. **Pedregosa, F., et al. (2011)**. "Scikit-learn: Machine Learning in Python," *Journal of Machine Learning Research*.
-3. **Streamlit, Inc.** *API Reference: Metrics, Sliders, and Dataframe visualization*. [Online].
-4. **CST Studio Suite**. *Post-processing and 0D Result Exporting Guidelines*.
-
----
-© 2026 張宇宸 | 中原大學電機工程學系 | 指導教授：黃崇豪
+## 🛠️ 環境配置
+```text
+streamlit
+pandas
+numpy
+scikit-learn
+matplotlib

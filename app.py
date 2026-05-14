@@ -11,21 +11,10 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.metrics import mean_absolute_error
 
-# --- 1. 專業 UI 配置與 CSS ---
-st.set_page_config(page_title="CYCU Antenna AI Lab", page_icon="📡", layout="wide")
+# --- 1. 頁面配置與校徽 ---
+st.set_page_config(page_title="CYCU Antenna AI Master", page_icon="📡", layout="wide")
 
-st.markdown("""
-    <style>
-    .main { background-color: #f0f2f6; }
-    .stMetric { 
-        background-color: #ffffff; padding: 15px; border-radius: 10px; 
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #004488;
-    }
-    div[data-testid="stExpander"] { background-color: #ffffff; border-radius: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 2. 核心算法與數據清洗 ---
+# --- 2. 核心訓練函數 ---
 @st.cache_resource
 def train_hyper_models(df):
     try:
@@ -46,106 +35,111 @@ def train_hyper_models(df):
         X_s = scaler.transform(X)
 
         models = {
-            "Linear Regression": MultiOutputRegressor(LinearRegression()),
-            "Random Forest": RandomForestRegressor(n_estimators=100, max_depth=8, random_state=42),
+            "Random Forest": RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42),
             "SVR": MultiOutputRegressor(SVR(kernel='rbf', C=10)),
-            "Gradient Boosting": MultiOutputRegressor(GradientBoostingRegressor(n_estimators=50, random_state=42)),
+            "GBM": MultiOutputRegressor(GradientBoostingRegressor(n_estimators=50, random_state=42)),
+            "Linear": MultiOutputRegressor(LinearRegression()),
             "KNN": KNeighborsRegressor(n_neighbors=5)
         }
-
-        trained_models = {name: m.fit(X_s, y) for name, m in models.items()}
-        
-        # 數據量演化數據
-        eff_list = []
-        for frac in [0.2, 0.5, 1.0]:
-            size = max(5, int(len(df) * frac))
-            for name, m in models.items():
-                m.fit(X_s[:size], y[:size])
-                mae = mean_absolute_error(y, m.predict(X_s))
-                eff_list.append({"模型": name, "數據量": f"{int(frac*100)}%", "MAE": round(mae, 4)})
-        
-        return scaler, trained_models, found_f, len(df), pd.DataFrame(eff_list)
+        trained = {name: m.fit(X_s, y) for name, m in models.items()}
+        return scaler, trained, found_f, len(df), df[found_f].min(), df[found_f].max()
     except: return None
 
-# --- 3. 側邊欄與數據載入 ---
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/zh/thumb/4/4e/Chung_Yuan_Christian_University_Logo.svg/1200px-Chung_Yuan_Christian_University_Logo.svg.png", width=100)
-st.sidebar.title("中原大學電機系\n天線 AI 研究室")
-st.sidebar.write(f"作者：張宇宸 | 指導：黃崇豪 教授")
+# --- 3. 介面與數據載入 ---
+st.sidebar.image("https://upload.wikimedia.org/wikipedia/zh/thumb/4/4e/Chung_Yuan_Christian_University_Logo.svg/1200px-Chung_Yuan_Christian_University_Logo.svg.png", width=80)
+st.sidebar.title("中原電機天線 AI 站")
+st.sidebar.caption("作者：張宇宸 | 指導：黃崇豪 教授")
 
-data_mode = st.sidebar.radio("數據源：", ("系統內建", "手動上傳"))
-if data_mode == "系統內建":
-    raw_df = pd.read_csv('antenna_data.csv', sep=None, engine='python')
-else:
-    uploaded_file = st.sidebar.file_uploader("上傳 CSV", type=["csv"])
-    if not uploaded_file: st.stop()
-    raw_df = pd.read_csv(uploaded_file, sep=None, engine='python')
-
+raw_df = pd.read_csv('antenna_data.csv', sep=None, engine='python')
 res = train_hyper_models(raw_df)
-if not res: st.stop()
-scaler, m_dict, feat_cols, n_samples, eff_df = res
+scaler, m_dict, feat_cols, n_samples, f_min, f_max = res
 
+# --- 4. 側邊欄控制：參數輸入 ---
+st.sidebar.subheader("🛠️ 參數調試")
+u_vals = [st.sidebar.number_input(f"{f}", value=float(raw_df[f].mean()), step=0.01, format="%.2f") for f in feat_cols]
+
+# 功能 3: 鎖定目前結果進行比較
 st.sidebar.divider()
-st.sidebar.subheader("📐 設計尺寸輸入 (mm)")
-u_vals = [st.sidebar.number_input(f"{f}", value=raw_df[f].mean(), step=0.01, format="%.2f") for f in feat_cols]
+if 'locked_pred' not in st.session_state: st.session_state.locked_pred = None
+if 'locked_vals' not in st.session_state: st.session_state.locked_vals = None
 
-# --- 4. 預測與分析邏輯 ---
-input_s = scaler.transform([u_vals])
-all_preds = {name: m.predict(input_s)[0] for name, m in m_dict.items()}
-consensus_pred = np.mean(list(all_preds.values()), axis=0)
+if st.sidebar.button("🔒 鎖定目前曲線作為對照"):
+    input_s = scaler.transform([u_vals])
+    st.session_state.locked_pred = m_dict["Random Forest"].predict(input_s)[0]
+    st.session_state.locked_vals = u_vals
+    st.sidebar.success("已鎖定！調整參數即可看見對比。")
 
-# --- 5. 主介面展示 ---
-st.title("🔬 WiFi 6E 天線多模型設計實驗室")
-st.caption(f"Status: 🟢 系統運行中 | 訓練樣本: {n_samples} | 演算法: 五大混合模型")
+if st.sidebar.button("🔓 清除對照"):
+    st.session_state.locked_pred = None
+    st.sidebar.info("對照已清除")
 
-# KPI 儀表板
-cols = st.columns(3)
+# --- 5. 主視覺顯示 ---
+st.title("📡 WiFi 6E 天線設計：AI 實時優化工作站")
+
+# 進行當前預測
+input_cur = scaler.transform([u_vals])
+p_cur = m_dict["Random Forest"].predict(input_cur)[0]
 freq_names = ["2.45 GHz", "5.5 GHz", "6.5 GHz"]
-for i, col in enumerate(cols):
-    val = consensus_pred[i]
-    status = "✅ PASS" if val < -10 else "❌ FAIL"
-    col.metric(f"S11 @ {freq_names[i]}", f"{val:.2f} dB", delta=status, delta_color="normal" if val < -10 else "inverse")
 
-st.divider()
+c1, c2 = st.columns([2, 1])
 
-# 交叉比對表格與特徵重要性
-left, right = st.columns([2, 1])
-
-with left:
-    st.subheader("📋 五大模型即時預測比對")
-    res_table = pd.DataFrame(all_preds, index=freq_names).T
-    st.table(res_table.style.highlight_min(axis=0, color='#d4edda'))
+with c1:
+    st.subheader("📈 頻譜比較與趨勢分析")
+    fig, ax = plt.subplots(figsize=(10, 5))
+    freq_pts = [2.45, 5.5, 6.5]
     
-    # 下載按鈕
-    csv = res_table.to_csv().encode('utf-8')
-    st.download_button("💾 導出預測報告 (CSV)", csv, "antenna_report.csv", "text/csv")
+    # 繪製當前曲線
+    ax.plot(freq_pts, p_cur, 'o-', color='#1f77b4', linewidth=3, label='Current Design')
+    
+    # 繪製鎖定曲線 (功能 3)
+    if st.session_state.locked_pred is not None:
+        ax.plot(freq_pts, st.session_state.locked_pred, 'o--', color='#ff7f0e', alpha=0.6, label='Locked Comparison')
+        ax.fill_between(freq_pts, p_cur, st.session_state.locked_pred, color='gray', alpha=0.1)
+    
+    ax.axhline(-10, color='red', linestyle=':', label='-10dB Threshold')
+    ax.set_ylim(-35, 0)
+    ax.set_xlabel("Frequency (GHz)")
+    ax.set_ylabel("S11 (dB)")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    st.pyplot(fig)
 
-with right:
-    st.subheader("🎯 特徵敏感度分析")
-    # 從隨機森林提取重要性
-    importances = m_dict["Random Forest"].feature_importances_
-    imp_df = pd.DataFrame({"參數": feat_cols, "影響權重": importances}).sort_values(by="影響權重", ascending=True)
-    fig_imp, ax_imp = plt.subplots(figsize=(5, 4))
-    ax_imp.barh(imp_df["參數"], imp_df["影響權重"], color="#004488")
-    ax_imp.set_title("幾何尺寸對頻率的影響程度")
-    st.pyplot(fig_imp)
+with c2:
+    st.subheader("🎯 當前設計狀態")
+    for i in range(3):
+        delta = p_cur[i] - (st.session_state.locked_pred[i] if st.session_state.locked_pred is not None else p_cur[i])
+        st.metric(f"S11 @ {freq_names[i]}", f"{p_cur[i]:.2f} dB", delta=f"{delta:.2f} vs Locked" if st.session_state.locked_pred is not None else None, delta_color="inverse")
 
-# 底部進階功能
+# --- 6. 功能 4: 反向設計推薦系統 ---
 st.divider()
-exp1, exp2 = st.columns(2)
+st.subheader("🤖 AI 反向設計導航員 (Dimension Recommender)")
+col_rec1, col_rec2 = st.columns([1, 2])
 
-with exp1:
-    with st.expander("📉 查看數據量學習效率矩陣"):
-        st.write("展示各模型在 20% vs 100% 數據量下的誤差演化 (MAE)")
-        eff_pivot = eff_df.pivot(index="模型", columns="數據量", values="MAE")
-        st.dataframe(eff_pivot, use_container_width=True)
+with col_rec1:
+    target_s11 = st.slider("目標 S11 門檻 (dB)", -25.0, -10.0, -15.0)
+    if st.button("🚀 開始尋找最佳尺寸"):
+        with st.spinner("AI 正在模擬 500 組組合..."):
+            # 隨機生成 500 組範圍內的尺寸
+            samples = np.random.uniform(f_min, f_max, (500, 3))
+            s_scaled = scaler.transform(samples)
+            s_preds = m_dict["Random Forest"].predict(s_scaled)
+            
+            # 評分機制：三個頻段都低於目標值，且平均值最小的
+            score = np.mean(s_preds, axis=1)
+            valid_mask = np.all(s_preds < target_s11, axis=1)
+            
+            if np.any(valid_mask):
+                best_idx = np.argmin(score[valid_mask])
+                best_dims = samples[valid_mask][best_idx]
+                st.session_state.rec_dims = best_dims
+                st.success("🎯 找到理想組合！")
+            else:
+                st.error("無法在目前範圍內找到符合全頻段目標的組合，請放寬門檻。")
 
-with exp2:
-    with st.expander("🤖 反向設計建議 (Dimensions Recommendation)"):
-        st.write("系統自動模擬 100 組隨機尺寸，尋找 S11 最優組合：")
-        # 簡單隨機優化器
-        random_samples = np.random.uniform(raw_df[feat_cols].min(), raw_df[feat_cols].max(), (100, 3))
-        rs_scaled = scaler.transform(random_samples)
-        rs_preds = m_dict["Random Forest"].predict(rs_scaled)
-        best_idx = np.argmin(np.mean(rs_preds, axis=1))
-        best_dim = random_samples[best_idx]
-        st.success(f"推薦尺寸：Dist={best_dim[0]:.2f}, L={best_dim[1]:.2f}, W={best_dim[2]:.2f}")
+with col_rec2:
+    if 'rec_dims' in st.session_state:
+        st.write("✨ **AI 推薦尺寸建議：**")
+        d_cols = st.columns(3)
+        for i, f in enumerate(feat_cols):
+            d_cols[i].info(f"**{f}**\n\n{st.session_state.rec_dims[i]:.2f} mm")
+        st.caption("請將左側調試參數設為上述數值，以驗證預測頻譜。")
