@@ -18,30 +18,24 @@ st.set_page_config(page_title="CYCU Antenna AI Lab", page_icon="📡", layout="w
 st.markdown("""
     <style>
     .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #004488; }
+    .highlight-box { background-color: #f0f7ff; padding: 20px; border-radius: 10px; border: 1px solid #b3d7ff; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 核心訓練函數 (動態偵測欄位與四變數最佳化) ---
+# --- 2. 核心訓練函數 (動態偵測欄位與四變數) ---
 @st.cache_resource
 def train_full_suite(df):
     try:
-        # 清洗欄位名稱，移除前後空格
         df.columns = [str(col).strip() for col in df.columns]
-        
-        # 鎖定最新的「四個幾何變數」特徵
         target_features = ['L_p', 'L_slot', 'W_slot', 'W_slot2']
         found_f = [col for col in df.columns if any(p.lower() == col.lower() for p in target_features)]
         
-        # 尋找目標 S11 欄位 (相容 CST 各種導出命名)
         found_t = [col for col in df.columns if "s1,1" in col.lower() or "s11" in col.lower() or "0d" in col.lower()]
-        
-        # 排序確保頻段對齊 (2.45 -> 5.5 -> 6.5)
         found_t = sorted(found_t, key=lambda x: [float(s) for s in ["2.45", "5.5", "6.5"] if s in x] or [0])
 
         if len(found_f) < 4 or len(found_t) < 3: 
             return None
             
-        # 關鍵：剔除沒有 S11 標籤的資料（例如空殼的 581 檔），只留完整可訓練的數據
         df_clean = df.dropna(subset=found_f + found_t)
         if len(df_clean) < 10: return None
         
@@ -49,7 +43,6 @@ def train_full_suite(df):
         scaler = StandardScaler().fit(X)
         X_s = scaler.transform(X)
 
-        # 五大模型定義
         models_def = {
             "Random Forest": RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42),
             "SVR": MultiOutputRegressor(SVR(kernel='rbf', C=10)),
@@ -60,7 +53,6 @@ def train_full_suite(df):
         
         trained_models = {name: m.fit(X_s, y) for name, m in models_def.items()}
 
-        # 數據效率分析
         eff_list = []
         for frac in [0.2, 0.5, 1.0]:
             size = max(5, int(len(df_clean) * frac))
@@ -73,37 +65,27 @@ def train_full_suite(df):
     except Exception as e:
         return None
 
-# --- 3. ⚙️ 自動掃描資料夾內所有 CSV 檔案並合併 ---
+# --- 3. 自動掃描資料夾內所有 CSV 檔案 ---
 def load_and_combine_folder(folder_name="data_folder"):
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
-    
-    # 抓取資料夾內所有 .csv 檔案
     csv_files = glob.glob(os.path.join(folder_name, "*.csv"))
-    
     if not csv_files:
         return None, []
     
     combined_list = []
     file_names = []
-    
     for file in csv_files:
         try:
-            # 支援自動辨識 Tab 鍵或逗號分隔
             tmp_df = pd.read_csv(file, sep=None, engine='python')
             tmp_df.columns = [str(col).strip() for col in tmp_df.columns]
             combined_list.append(tmp_df)
             file_names.append(os.path.basename(file))
         except:
             continue
-            
     if not combined_list:
         return None, []
-        
-    # 將所有讀取到的 CSV 合併成一個大型 DataFrame
-    # 使用 join='outer' 可以確保就算有些檔案欄位不完全相同，也能完整保留並自動對齊
-    combined_df = pd.concat(combined_list, axis=0, ignore_index=True, join='outer')
-    return combined_df, file_names
+    return pd.concat(combined_list, axis=0, ignore_index=True, join='outer'), file_names
 
 # --- 4. 側邊欄與資料載入 ---
 st.sidebar.image("https://upload.wikimedia.org/wikipedia/zh/thumb/4/4e/Chung_Yuan_Christian_University_Logo.svg/1200px-Chung_Yuan_Christian_University_Logo.svg.png", width=80)
@@ -112,54 +94,75 @@ st.sidebar.caption("作者：張宇宸 | 指導：黃崇豪 教授")
 
 st.sidebar.divider()
 st.sidebar.subheader("📂 自動化資料庫狀態")
-
-# 執行自動資料夾掃描
 folder_to_scan = "data_folder"
 raw_df, detected_files = load_and_combine_folder(folder_to_scan)
 
 if raw_df is None:
     st.sidebar.error(f"❌ 在 `{folder_to_scan}` 資料夾中找不到任何 CSV 檔案！")
-    st.sidebar.info("💡 請在專案中建立 `data_folder` 資料夾並放入天線 CSV 數據檔案。")
     st.stop()
 else:
-    st.sidebar.success(f"🟢 成功自動偵測並合併 {len(detected_files)} 個檔案：")
-    for f_name in detected_files:
-        st.sidebar.caption(f"📄 {f_name}")
+    st.sidebar.success(f"🟢 成功自動合併 {len(detected_files)} 個檔案")
 
-# 執行訓練
 res = train_full_suite(raw_df)
 if not res: 
-    st.error("錯誤：無法從合併後的檔案中辨識出『四個幾何變數（L_p, L_slot, W_slot, W_slot2）』或 S11 目標欄位，請檢查檔案標頭名稱！")
+    st.error("錯誤：欄位不匹配！")
     st.stop()
 
 scaler, m_dict, feat_cols, n_samples, eff_df, f_min, f_max = res
 
 st.sidebar.divider()
-st.sidebar.subheader("📐 四變數幾何參數調試")
-# 根據自動讀取到的四變數，自動產出對應的輸入框
+st.sidebar.subheader("📐 四變數參數調試")
 u_vals = [st.sidebar.number_input(f"{f} (mm)", value=float(raw_df[f].dropna().mean()), step=0.01, format="%.2f") for f in feat_cols]
 
-# 🔒 鎖定功能
 if 'locked_pred' not in st.session_state: st.session_state.locked_pred = None
 if st.sidebar.button("🔒 鎖定目前曲線"):
     st.session_state.locked_pred = m_dict["Random Forest"].predict(scaler.transform([u_vals]))[0]
 if st.sidebar.button("🔓 清除鎖定"):
     st.session_state.locked_pred = None
 
-# --- 5. 主介面預測與 KPI ---
+# --- 5. 新增功能：五大模型數據大會師與冠軍挑選 ---
 input_cur = scaler.transform([u_vals])
 all_preds = {name: m.predict(input_cur)[0] for name, m in m_dict.items()}
+
+# 尋找全模型中表現最好的 S11 數據與其模型
+freq_names = ["2.45 GHz", "5.5 GHz", "6.5 GHz"]
+best_model_per_freq = {}
+best_val_per_freq = {}
+
+for idx, freq in enumerate(freq_names):
+    # 天線 S11 越小（越負值）代表效能越好，所以用 min 尋找最小值
+    best_model = min(all_preds.keys(), key=lambda m: all_preds[m][idx])
+    best_val = all_preds[best_model][idx]
+    best_model_per_freq[freq] = best_model
+    best_val_per_freq[freq] = best_val
+
+# 主視覺以預測最穩定的隨機森林為預設基準線
 consensus_pred = all_preds["Random Forest"] 
 
 st.title("📡 WiFi 6E 天線：自動化大數據 AI 實驗室")
 st.caption(f"📊 資料庫總計有效訓練樣本數: {n_samples} 筆 | 狀態: 🟢 多檔案自動鏈結中")
 
+# 頂部儀表板
 kpi_cols = st.columns(3)
-freq_names = ["2.45 GHz", "5.5 GHz", "6.5 GHz"]
 for i, col in enumerate(kpi_cols):
     val = consensus_pred[i]
     delta = val - st.session_state.locked_pred[i] if st.session_state.locked_pred is not None else None
-    col.metric(f"S11 @ {freq_names[i]}", f"{val:.2f} dB", delta=f"{delta:.2f}" if delta else None, delta_color="inverse")
+    col.metric(f"S11 @ {freq_names[i]} (RF基準)", f"{val:.2f} dB", delta=f"{delta:.2f}" if delta else None, delta_color="inverse")
+
+st.divider()
+
+# --- 🏆 亮點新功能：AI 數據決策核心看板 ---
+st.markdown("### 🏆 冠軍模型決策看板 (AI Optimization Analytics)")
+analytics_cols = st.columns(3)
+for i, freq in enumerate(freq_names):
+    with analytics_cols[i]:
+        st.markdown(f"""
+        <div class="highlight-box">
+            <h4>🎯 頻段 {freq} 最優解</h4>
+            <p>🥇 <b>最佳預測模型：</b> <span style='color:#004488'>{best_model_per_freq[freq]}</span></p>
+            <p>📉 <b>最優 S11 數值：</b> <span style='color:#28a745; font-size:18px; font-weight:bold;'>{best_val_per_freq[freq]:.2f} dB</span></p>
+        </div>
+        """, unsafe_allow_html=True)
 
 st.divider()
 
@@ -167,10 +170,15 @@ st.divider()
 left, right = st.columns([2, 1])
 
 with left:
-    st.subheader("📈 頻譜對照圖 (隨機森林基準)")
+    st.subheader("📈 頻譜對照圖")
     fig, ax = plt.subplots(figsize=(10, 5))
     freq_pts = [2.45, 5.5, 6.5]
-    ax.plot(freq_pts, consensus_pred, 'o-', linewidth=3, color='#1f77b4', label='Current Design')
+    ax.plot(freq_pts, consensus_pred, 'o-', linewidth=3, color='#1f77b4', label='Current Design (RF)')
+    
+    # 在圖表上特別標註出每個頻段五個模型中的最低極致點
+    best_pts = [best_val_per_freq[f] for f in freq_names]
+    ax.scatter(freq_pts, best_pts, color='gold', s=150, zorder=5, edgecolor='black', label='AI Best S11 Points')
+    
     if st.session_state.locked_pred is not None:
         ax.plot(freq_pts, st.session_state.locked_pred, 'o--', color='#ff7f0e', alpha=0.5, label='Locked Design')
     ax.axhline(-10, color='red', linestyle=':', label='-10dB Spec')
@@ -191,7 +199,6 @@ st.divider()
 
 # --- 7. 敏感度與效率分析 ---
 low1, low2 = st.columns(2)
-
 with low1:
     st.subheader("🎯 四變數幾何敏感度分析 (Feature Importance)")
     importances = m_dict["Random Forest"].feature_importances_
@@ -213,7 +220,6 @@ rec_c1, rec_c2 = st.columns([1, 2])
 with rec_c1:
     target = st.slider("目標 S11 門檻 (dB)", -25.0, -10.0, -15.0)
     if st.button("🚀 搜尋最佳尺寸"):
-        # 在四個變數的上下限空間內進行 500 組蒙地卡羅抽樣
         samples = np.random.uniform(f_min, f_max, (500, len(feat_cols)))
         preds = m_dict["Random Forest"].predict(scaler.transform(samples))
         valid = np.all(preds < target, axis=1)
