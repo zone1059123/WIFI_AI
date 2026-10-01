@@ -10,24 +10,6 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.svm import SVR
-
-# 1. 頁面配置
-st.set_page_config(
-    page_title="Wi-Fi 6import os",
-    layout="wide"
-)
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import streamlit as st
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.neural_network import MLPRegressor
-from sklearn.svm import SVR
-
 # 1. 頁面配置
 st.set_page_config(
     page_title="Wi-Fi 6E 多代理模型協同尋優工作站", layout="wide"
