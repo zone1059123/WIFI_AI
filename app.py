@@ -382,8 +382,7 @@ if st.button("生成正式 Word 報告文本"):
 4. 粒子群演算法 (PSO) 反向尋優驗證
 透過粒子群優化演算法 (PSO)，系統在 4D 參數空間中經由 20 代疊代演化，導出最佳天線尺寸組合，有效解決了天線反向設計不適定問題。
 """
-  st.text_area("動態生成報告文本", value=report_content, height=350)E 多代理模型協同尋優工作站", layout="wide"
-)
+  st.text_area("動態生成報告文本", value=report_content, height=350)
 
 st.title(
     "結合雙面幾何開槽與缺陷接地結構之 Wi-Fi 6E 三頻天線設計暨智能群體演算法尋優機制研究"
