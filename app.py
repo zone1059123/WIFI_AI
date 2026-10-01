@@ -13,7 +13,9 @@ from sklearn.svm import SVR
 
 # 1. 頁面配置
 st.set_page_config(
-    page_title="Wi-Fi 6import os
+    page_title="Wi-Fi 6import os",
+    layout="wide"
+)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
